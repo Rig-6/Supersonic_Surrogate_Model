@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+venv/
+*.pyc
+.env
+
+# Data and Models
+*.csv
+*.h5
+*.pt
+*.pth
+*.onnx
+
+# OpenVSP and CAD
+*.vsp3
+*.stl
+*.tri
+*.step
+*.iges
+
+# CFD Outputs (Adjust based on solver)
+*.cgns
+*.su2
+*.dat
+*.log
+*.vtk
+
+# C++/Hardware (for elko)
+build/
+*.bin
+*.elf
+*.hex
