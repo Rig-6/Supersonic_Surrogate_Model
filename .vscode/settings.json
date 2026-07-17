@@ -1,0 +1,6 @@
+{
+    "python.analysis.extraPaths": [
+        "C:\\OpenVSP\\python"
+    ],
+    "python-envs.defaultEnvManager": "ms-python.python:system"
+}
