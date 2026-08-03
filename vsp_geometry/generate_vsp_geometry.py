@@ -65,11 +65,13 @@ vsp = load_vsp_module()
 
 # --> Section 1: Generate parameter limit lists
 
-lengths = np.linspace(50, 150, 3)
-diameters = np.linspace(5, 15, 3)
-nose_radii = np.linspace(1.0, 5.0, 3)
+SIZE_FACTOR = 1  # Scale factor to reduce the size of the generated geometries
 
-iteration_total = len(lengths) * len(diameters) * len(nose_radii)
+fineness = np.linspace(4, 8, 3) * SIZE_FACTOR
+diameters = np.linspace(1, 3, 3) * SIZE_FACTOR
+nose_radii = np.linspace(0.1, 0.4, 3) * SIZE_FACTOR
+
+iteration_total = len(fineness) * len(diameters) * len(nose_radii)
 
 print(f"Generating {iteration_total} nose cones with parameter combinations")
 
@@ -96,28 +98,28 @@ with open(comb_file_name, mode='w', newline='') as csv_file:
 
 iteration = 0
 
-for L in lengths:
+for F in fineness:
     for D in diameters:
         for R in nose_radii:
             iteration += 1
+            L = F * D  # Calculate length based on fineness ratio and diameter
             
             # Clean OpenVSP Workspace
             vsp.ClearVSPModel()
 
             # Create geometry
             nose_cone_id = vsp.AddGeom("POD")
-            fineness = L/D
 
             # Modify geometry parameters
             vsp.SetParmVal(nose_cone_id, "Length", "Design", L)
 
             # Bluntness is controlled by the fineness ratio, which is the length divided by the diameter
-            vsp.SetParmVal(nose_cone_id, "FineRatio", "Design", fineness)
+            vsp.SetParmVal(nose_cone_id, "FineRatio", "Design", F)
 
-            # Smooth the mesh by increasing the number of circumferential and longitudinal cuts
-            vsp.SetParmVal(nose_cone_id, "Tess_U", "Shape", 81) # Smooths around the circle
-            vsp.SetParmVal(nose_cone_id, "Tess_W", "Shape", 81) # Smooths along the length
-            vsp.Update()
+            # Smooth the mesh by increasing the number of circumferential and longitudinal cuts (Doesn't matter for STEP files)
+            # vsp.SetParmVal(nose_cone_id, "Tess_U", "Shape", 81) # Smooths around the circle
+            # vsp.SetParmVal(nose_cone_id, "Tess_W", "Shape", 81) # Smooths along the length
+            # vsp.Update()
 
             # Generate the filename 
             filename = f"cone_L{L:.1f}_D{D:.1f}_R{R:.1f}.stp"
