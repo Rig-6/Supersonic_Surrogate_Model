@@ -17,6 +17,8 @@ venv/
 *.tri
 *.step
 *.iges
+*.stp
+*.stp.bak
 
 # CFD Outputs (Adjust based on solver)
 *.cgns

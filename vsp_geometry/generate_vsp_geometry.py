@@ -68,19 +68,13 @@ lengths = np.linspace(50, 150, 3)
 diameters = np.linspace(5, 15, 3)
 nose_radii = np.linspace(1.0, 5.0, 3)
 
-# Wind tunnel sizing for the Body of Revolution geometry.
-# The BOR uses XForm Scale to stretch its axial length, so compensate the diameter
-# by the same factor to preserve the final tunnel diameter.
-wind_tunnel_length_multiplier = 20.0
-wind_tunnel_diameter_multiplier = 20.0
-
 iteration_total = len(lengths) * len(diameters) * len(nose_radii)
 
 print(f"Generating {iteration_total} nose cones with parameter combinations")
 
 # --> Section 2: Create the CSV file to store the parameter combinations
 
-geom_dir = Path("C:\\Users\\Ronith\\NoseConeProML\\vsp_geometry\\generated_geometries")
+geom_dir = Path("C:\\Users\\s3nor\\Documents\\NoseConeProML\\vsp_geometry\\generated_geometries\\")
 geom_dir.mkdir(exist_ok=True)
 
 comb_file_name = geom_dir / "parameter_combinations.csv"
