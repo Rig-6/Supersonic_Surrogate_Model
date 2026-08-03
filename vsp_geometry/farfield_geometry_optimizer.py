@@ -13,8 +13,12 @@ gmsh.initialize()
 gmsh.model.add("farfield_volume_geometry")
 print(f"Initialized gmsh and added model for farfield volume geometry.[{step_num+1}]")
 
+# Fix local pathing issues
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+
 # Import the STEP file and its geometries and convert it to a list of shapes
-gmsh.model.occ.importShapes("C:\\Users\\s3nor\\Documents\\NoseConeProML\\vsp_geometry\\generated_geometries\\cone_L50.0_D5.0_R1.0.stp")
+gmsh.model.occ.importShapes(SCRIPT_DIR / "generated_geometries" / "cone_L50.0_D5.0_R1.0.stp")
 step_num += 1
 print(f"Imported STEP file and converted to shapes.[{step_num+1}]")
 
@@ -66,7 +70,7 @@ gmsh.model.occ.synchronize()
 print(f"Cut the farfield volume with the solid. Resulting fluid domain tag: {fluid_tag}.")
 
 # Write the final geometry to a STEP file
-gmsh.write("C:\\Users\\s3nor\\Documents\\NoseConeProML\\vsp_geometry\\generated_geometries\\optimized_geometries\\farfield_volume_geometry.step")
+gmsh.write(SCRIPT_DIR / "generated_geometries" / "optimized_geometries" / "farfield_volume_geometry.step")
 
 # Display file in window
 if 'close' not in sys.argv:
