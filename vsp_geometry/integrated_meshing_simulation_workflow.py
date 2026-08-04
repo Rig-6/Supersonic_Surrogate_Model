@@ -42,26 +42,30 @@ describe_geometry() # Execute the Describe Geometry function
 print(f"---STEP 3: COMPLETED--- Described geometry for geometry: {import_file_name} into Fluent Meshing session.")
 
 # ---STEP 4: Update boundaries and regions---
+watertight.update_regions() # Execute the Update Regions function
+
 update_boundaries = watertight.update_boundaries # Load the Update Boundaries function
-update_boundaries.boundary_zone_list = ["wall-inlet"]
-update_boundaries.boundary_label_list = ["wall-inlet"]
-update_boundaries.boundary_label_list = ["wall"]
-update_boundaries.old_boundary_label_list = ["wall-inlet"]
-update_boundaries.old_boundary_label_type_list = ["velocity-inlet"]
+# update_boundaries.boundary_zone_list = ["wall-inlet"]
+# update_boundaries.boundary_label_list = ["wall-inlet"]
+# update_boundaries.boundary_label_list = ["wall"]
+# update_boundaries.old_boundary_label_list = ["wall-inlet"]
+# update_boundaries.old_boundary_label_type_list = ["velocity-inlet"]
 update_boundaries() # Execute the Update Boundaries function
 
-watertight.update_regions() # Execute the Update Regions function
-print(f"---STEP 4: COMPLETED--- Updated boundaries for geometry: {import_file_name} into Fluent Meshing session.")
+print(f"---STEP 4: COMPLETED--- Updated regions and boundaries for geometry: {import_file_name} into Fluent Meshing session.")
 
 # ---STEP 5: Add boundary Layers---
-add_bl = watertight.add_boundary_layers # Load the Add Boundary Layers function
-add_bl.control_name = "smmooth-transition_1" # Set the control name for the boundary layers to smooth transition
-add_bl.insert_compound_child_task() # Insert the compound child task for the Add Boundary Layers function
-watertight.add_boundary_layers_child_1() # Execute the Add Boundary Layers function
-print(f"---STEP 5: COMPLETED--- Added boundary layers for geometry: {import_file_name} into Fluent Meshing session.")
+# add_bl = watertight.add_boundary_layers # Load the Add Boundary Layers function
+# add_bl.control_name = "smmooth-transition_1" # Set the control name for the boundary layers to smooth transition
+# add_bl.number_of_layers = 10 # Set the number of layers for the boundary layers
+# add_bl.growth_rate = 1.2 # Set the growth rate for the boundary layers
+# add_bl.insert_compound_child_task() # Insert the compound child task for the Add Boundary Layers function
+# watertight.add_boundary_layers_child_1() # Execute the Add Boundary Layers function
+# print(f"---STEP 5: COMPLETED--- Added boundary layers for geometry: {import_file_name} into Fluent Meshing session.")
 
 # ---STEP 6: Update regions and boundaries---
 volume_mesh = watertight.create_volume_mesh_wtm # Load the Create Volume Mesh function
+volume_mesh.max_size = 0.3 # Set the maximum size for the volume mesh
 volume_mesh.volume_fill_type = "poly-hexcore" # Set the volume fill type to polyhexcore
 volume_mesh() # Execute the Create Volume Mesh function
 print(f"---STEP 6: COMPLETED--- Created volume mesh for geometry: {import_file_name} into Fluent Meshing session.")
