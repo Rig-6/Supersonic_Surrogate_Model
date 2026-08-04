@@ -19,7 +19,7 @@ print(f"Initialized gmsh, beginning farfield processing...")
 # Fix local pathing issues
 SCRIPT_DIR = Path(__file__).resolve().parent
 inp_geom_dir = Path(str(SCRIPT_DIR / "generated_geometries")) # Change to change outputs
-opt_geom_dir = Path(str(inp_geom_dir / "optimized_geometries"))
+opt_geom_dir = Path(str(SCRIPT_DIR / "farfield_optimized_geometries"))
 opt_geom_dir.mkdir(exist_ok=True)
 
 for input_path in glob.glob(os.path.join(inp_geom_dir, "*.stp")):
