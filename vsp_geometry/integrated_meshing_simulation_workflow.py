@@ -22,6 +22,52 @@ os.environ["FLUENT_NO_AUTOMATIC_TRANSCRIPT"] = "1"
 meshy_session = pyfluent.launch_fluent(mode=pyfluent.FluentMode.MESHING, precision=pyfluent.Precision.DOUBLE, processor_count=6)
 watertight = meshy_session.watertight() # Watertight Meshing Mode
 import_geometry = watertight.import_geometry # Load Import Geometry Function
+import_geometry.file_name = import_file_name # Set the file name for the geometry to be imported
+import_geometry.length_unit = "mm" # Set the length unit for the geometry
+import_geometry() # Execute the import geometry function
+print(f"---STEP 1: COMPLETED--- Imported geometry: {import_file_name} into Fluent Meshing session.")
+
+# ---STEP 2: Generate the Surface Mesh---
+surf_mesh = watertight.create_surface_mesh # Load the Generate Surface Mesh function
+surf_mesh.cfd_surface_mesh_controls.max_size = 0.3 # Set the maximum size for the surface mesh
+surf_mesh() # Execute the Generate Surface Mesh function
+print(f"---STEP 2: COMPLETED--- Generated surface mesh for geometry: {import_file_name} into Fluent Meshing session.")
+
+# ---STEP 3: Describe Geometry---
+describe_geometry = watertight.describe_geometry # Load the Describe Geometry function
+describe_geometry.update_child_tasks(SetupTypeChanged=False) # Update child tasks with SetupTypeChanged set to False
+describe_geometry.setup_type = "fluid" # Set Geometry Type
+describe_geometry.update_child_tasks(SetupTypeChanged=True) # Update the child tasks with SetupTypeChanged set to True
+describe_geometry() # Execute the Describe Geometry function
+print(f"---STEP 3: COMPLETED--- Described geometry for geometry: {import_file_name} into Fluent Meshing session.")
+
+# ---STEP 4: Update boundaries and regions---
+update_boundaries = watertight.update_boundaries # Load the Update Boundaries function
+update_boundaries.boundary_zone_list = ["wall-inlet"]
+update_boundaries.boundary_label_list = ["wall-inlet"]
+update_boundaries.boundary_label_list = ["wall"]
+update_boundaries.old_boundary_label_list = ["wall-inlet"]
+update_boundaries.old_boundary_label_type_list = ["velocity-inlet"]
+update_boundaries() # Execute the Update Boundaries function
+
+watertight.update_regions() # Execute the Update Regions function
+print(f"---STEP 4: COMPLETED--- Updated boundaries for geometry: {import_file_name} into Fluent Meshing session.")
+
+# ---STEP 5: Add boundary Layers---
+add_bl = watertight.add_boundary_layers # Load the Add Boundary Layers function
+add_bl.control_name = "smmooth-transition_1" # Set the control name for the boundary layers to smooth transition
+add_bl.insert_compound_child_task() # Insert the compound child task for the Add Boundary Layers function
+watertight.add_boundary_layers_child_1() # Execute the Add Boundary Layers function
+print(f"---STEP 5: COMPLETED--- Added boundary layers for geometry: {import_file_name} into Fluent Meshing session.")
+
+# ---STEP 6: Update regions and boundaries---
+volume_mesh = watertight.create_volume_mesh_wtm # Load the Create Volume Mesh function
+volume_mesh.volume_fill_type = "poly-hexcore" # Set the volume fill type to polyhexcore
+volume_mesh() # Execute the Create Volume Mesh function
+print(f"---STEP 6: COMPLETED--- Created volume mesh for geometry: {import_file_name} into Fluent Meshing session.")
+
+
+
 
 
 '''
