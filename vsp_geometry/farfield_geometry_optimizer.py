@@ -67,9 +67,15 @@ for input_path in glob.glob(os.path.join(inp_geom_dir, "*.stp")):
     print(f"Created farfield volume with tag {farfield_tag}. [{(step_num := step_num + 1)}/3]")
 
     # Cut the farfield volume with the solid to create the final geometry
-    fluid_tag = gmsh.model.occ.cut([(3, farfield_tag)], [(solid)], removeObject=True)
+    fluid_tag = gmsh.model.occ.cut([(3, farfield_tag)], [(3, solid)], removeObject=True, removeTool=True)
     gmsh.model.occ.synchronize()
     print(f"Cut the farfield volume with the solid. Resulting fluid domain tag: {fluid_tag}.")
+
+    gmsh.option.setNumber("Geometry.OCCBoundsUseStl", 1)
+    gmsh.model.occ.removeAllDuplicates()
+
+    # Cut half of the farfield volume to create a half-domain for symmetry and reduced computational cost
+    # remove_half_tag = gmsh.model.occ.addBox(farfield_x_pos-10.0, 0.0, 0.0, farfield_total_length+20.0, farfield_diameter, farfield_diameter)
 
     # Write the final geometry to a STEP file
     gmsh.write(str(opt_geom_dir / f"{base_name}_ffd.stp"))
@@ -77,6 +83,8 @@ for input_path in glob.glob(os.path.join(inp_geom_dir, "*.stp")):
     # Display file in window
     # if 'close' not in sys.argv:
         # gmsh.fltk.run()
+
+    print(gmsh.model.getEntities(dim=3))
 
     # (For looping only) clear the model to prepare for the next iteration
     gmsh.model.remove()
