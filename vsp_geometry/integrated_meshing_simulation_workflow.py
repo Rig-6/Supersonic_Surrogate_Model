@@ -85,6 +85,7 @@ volume_mesh() # Execute the Create Volume Mesh function
 # Insert Improve Volume Mesh as a follow-up task
 improve_vol = volume_mesh.InsertNextTask(CommandName="ImproveVolumeMesh")
 improve_vol.Arguments.set_state({
+    ""
     "CellQualityLimit": 0.15,   # raise the minimum orthogonal quality target
 })
 improve_vol.Execute()
