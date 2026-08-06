@@ -5,6 +5,9 @@ import os
 import sys
 import glob
 
+# Scipy package for LHS feature
+import scipy
+
 # Data formatting through the csv module
 import csv
 
