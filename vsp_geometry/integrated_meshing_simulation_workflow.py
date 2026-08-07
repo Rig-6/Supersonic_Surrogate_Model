@@ -12,7 +12,7 @@ output_dir = Path(str(SCRIPT_DIR / "meshed_output"))
 output_dir.mkdir(exist_ok=True)
 
 # Resolve file paths and naming
-import_file_name = str(inp_ffd_dir / "cone_L12.0_D2.0_R0.1_ffd.stp")
+import_file_name = str(inp_ffd_dir / "cone_L4.0_D1.0_R0.1_ffd.stp")
 
 
 
@@ -21,7 +21,7 @@ os.environ["FLUENT_NO_AUTOMATIC_TRANSCRIPT"] = "1"
 # ---STEP 1: Import the geometry into Fluent Meshing---
 
 # Launch Fluent Meshing Session
-meshy_session = pyfluent.launch_fluent(mode=pyfluent.FluentMode.MESHING, precision=pyfluent.Precision.DOUBLE, processor_count=6, show_gui=True)
+meshy_session = pyfluent.launch_fluent(mode=pyfluent.FluentMode.MESHING, precision=pyfluent.Precision.DOUBLE, processor_count=8, show_gui=False)
 watertight = meshy_session.watertight() # Watertight Meshing Mode
 import_geometry = watertight.import_geometry # Load Import Geometry Function
 import_geometry.file_name = import_file_name # Set the file name for the geometry to be imported
@@ -29,10 +29,36 @@ import_geometry.length_unit = "mm" # Set the length unit for the geometry
 import_geometry() # Execute the import geometry function
 print(f"---STEP 1: COMPLETED--- Imported geometry: {import_file_name} into Fluent Meshing session.")
 
+add_local_sizing = meshy_session.workflow.TaskObject["Add Local Sizing"] # Load the Add Local Sizing function
+meshy_session.tui.boundary.separate.sep_face_zone_by_angle(['origin-open-cascade-step-translator-7.8-1-solid'], 40) # Separate the face zone by angle
+add_local_sizing.Arguments.set_state({
+    r'AddChild': r'yes',
+    r'BOICellsPerGap': 1,
+    r'BOIControlName': r'curvature',
+    r'BOICurvatureNormalAngle': 18,
+    r'BOIExecution': r'Curvature',
+    r'BOIFaceZoneList': [r'origin-open-cascade-step-translator-7.8-1-solid:8'],
+    r'BOIGrowthRate': 1.2,
+    r'BOIMaxSize': 10,
+    r'BOIMinSize': 0.05,
+    r'BOIZoneorLabel': r'zone',
+    r'ZoneLocation': [r'1', r'0', r'-609.59998', r'-609.59998', r'3657.6001', r'609.59998', r'609.59998', r'origin-open-cascade-step-translator-7.8-1-solid:8'],
+})
+add_local_sizing.AddChildAndUpdate(DeferUpdate=False) # Add the local sizing and update the child tasks
+
 # ---STEP 2: Generate the Surface Mesh---
-surf_mesh = watertight.create_surface_mesh # Load the Generate Surface Mesh function
-surf_mesh.cfd_surface_mesh_controls.min_size = 0.3 # Set the min size for the surface mesh
-surf_mesh() # Execute the Generate Surface Mesh function
+surf_mesh = meshy_session.workflow.TaskObject["Generate the Surface Mesh"] # Load the Generate Surface Mesh function
+surf_mesh.Arguments.set_state({
+    r'CFDSurfaceMeshControls': {r'DrawSizeControl': True,
+                                r'MaxSize': 819.2,
+                                r'MinSize': 10,
+                                r'SizeFunctions': r'Curvature',
+    },
+    r'ExecuteShareTopology': r'No',
+    r'OriginalZones': [r'open-cascade-step-translator-7.8-1-solid'],
+    r'SeparationRequired': r'No',
+    r'SurfaceMeshPreferences': {r'ShowSurfaceMeshPreferences': False,},
+})
 print(f"---STEP 2: COMPLETED--- Generated surface mesh for geometry: {import_file_name} into Fluent Meshing session.")
 
 # ---STEP 3: Describe Geometry---
@@ -43,6 +69,8 @@ describe_geometry.setup_type.set_state("The geometry consists of only fluid regi
 describe_geometry.update_child_tasks(setup_type_changed=True) # Update the child tasks with SetupTypeChanged set to True
 describe_geometry() # Execute the Describe Geometry function
 print(f"---STEP 3: COMPLETED--- Described geometry for geometry: {import_file_name} into Fluent Meshing session.")
+
+
 
 # ---STEP 4: Update boundaries and regions---
 update_regions = meshy_session.workflow.TaskObject["Update Regions"]
@@ -77,21 +105,30 @@ watertight.add_boundary_layer_child_1() # Execute the Add Boundary Layers
 print(f"---STEP 5: COMPLETED--- Added boundary layers for geometry: {import_file_name} into Fluent Meshing session.")
 
 # ---STEP 6: Update regions and boundaries---
-volume_mesh = watertight.create_volume_mesh # Load the Create Volume Mesh function
+'''volume_mesh = watertight.create_volume_mesh # Load the Create Volume Mesh function
 volume_mesh.max_size = 0.3 # Set the maximum size for the volume mesh
 volume_mesh.volume_fill_type = "poly-hexcore" # Set the volume fill type to polyhexcore
-volume_mesh() # Execute the Create Volume Mesh function
+volume_mesh.quality_warning_limit = 0.2 # Set the quality warning limit for the volume mesh
+volume_mesh() # Execute the Create Volume Mesh function'''
 
-# Insert Improve Volume Mesh as a follow-up task
-improve_vol = volume_mesh.InsertNextTask(CommandName="ImproveVolumeMesh")
-improve_vol.Arguments.set_state({
-    ""
-    "CellQualityLimit": 0.15,   # raise the minimum orthogonal quality target
+volume_mesh = meshy_session.workflow.TaskObject["Generate the Volume Mesh"] # Load the Create Volume Mesh function
+volume_mesh.Arguments.set_state({
+    r'MeshSolidRegions': False,
+    r"VolumeFill": "poly-hexcore", # r'MaxSize': 0.3?
+    r'VolumeFillControls': {
+        r'HexMaxCellLength': 819.2,
+        r'HexMaxSize': 819.2,
+        r'HexMinCellLength': 0.05,
+    },
 })
-improve_vol.Execute()
+
+# Add Quality Control? Not really necessary since quality is very high
+
+# r'VolumeFillControls': {
+#        r'MaxSize': 3,},
+
+volume_mesh.Execute()
 print(f"---STEP 6: COMPLETED--- Created volume mesh for geometry: {import_file_name} into Fluent Meshing session.")
-
-
 
 # --STEP 7: Save and Export Mesh---
 meshy_session.tui.file.write_mesh(f"{import_file_name}.msh.h5") # Save the mesh to a file
@@ -117,7 +154,13 @@ air.viscosity.sutherland.reference_temperature = 273.11 # Set the reference temp
 air.viscosity.sutherland.effective_temperature = 110.56 # Set the effective temperature for air to 110.56
 
 bc = solvy_session.settings.setup.boundary_conditions # Load the boundary conditions
-pressure_farfield = bc.pressure_far_field["farfield_volume"] # Load the pressure far field boundary condition
+solvy_session.settings.setup.boundary_conditions.set_zone_type(
+    zone_list=["open-cascade-step-translator-7.8-1-solid:1"],
+    new_type="pressure-far-field"
+)
+# print(bc.pressure_far_field.get_object_names()) # Get the object names for the pressure far field boundary condition
+farfield_names = bc.pressure_far_field.get_object_names() # Get the object names for the pressure far field boundary condition
+pressure_farfield = bc.pressure_far_field[farfield_names[0]] # Load the pressure far field boundary condition
 pressure_farfield.momentum.gauge_pressure = 0 # Set the gauge pressure for the pressure far field to 0
 pressure_farfield.momentum.mach_number = 2.0 # Set the mach number for the pressure far field to 2.0
 pressure_farfield.thermal.temperature = 288.15 # Set the temperature for the pressure far field to 288.15
@@ -134,8 +177,7 @@ solvy_session.settings.solution.initialization.hybrid_initialize()
 # )
 
 solvy_session.settings.solution.report_definitions.drag["cd_monitor"] = {
-    "zones": ["fluid"],   # use your auto-detected cone wall zone
-    "force_vector": [1, 0, 0],           # flow direction
+    "zones": ["open-cascade-step-translator-7.8-1-solid:14"],   # use your auto-detected cone wall zone           # flow direction
 }
 
 
