@@ -76,17 +76,12 @@ vsp = load_vsp_module()
 SIZE_FACTOR = 1  # Scale factor to reduce the size of the generated geometries
 
 
-fineness = np.linspace(4, 8, 3) * SIZE_FACTOR
-diameters = np.linspace(1, 3, 3) * SIZE_FACTOR
-nose_radii = np.linspace(0.1, 0.4, 3) * SIZE_FACTOR
 
 lower_bounds = [4 * SIZE_FACTOR, 1 * SIZE_FACTOR, 0.1 * SIZE_FACTOR]
 upper_bounds = [8 * SIZE_FACTOR, 3 * SIZE_FACTOR, 0.4 * SIZE_FACTOR]
 
 
-iteration_total = len(fineness) * len(diameters) * len(nose_radii)
 
-print(f"Generating {iteration_total} nose cones with parameter combinations")
 
 # --> Section 2: Create the CSV file to store the parameter combinations
 
@@ -108,9 +103,10 @@ with open(comb_file_name, mode='w', newline='') as csv_file:
 
 
 # --> Section 3: Generate the geometries and save them as STL files
-num_samples = 27 # Total number of samples to generate
-samples = sampler.random(n=num_samples) # Generates num_samples amount samples, samples have 3 parameters (fineness, diameter, nose radius)
+iteration_total = 27 # Total number of samples to generate
+samples = sampler.random(n=iteration_total) # Generates iteration_total amount samples, samples have 3 parameters (fineness, diameter, nose radius)
 iteration = 0
+print(f"Generating {iteration_total} nose cones with parameter combinations")
 
 samples = qmc.scale(samples, lower_bounds, upper_bounds) #fits sample parameters of fineness, diameter, and nose radius to the upper and lower bounds
 
@@ -181,7 +177,7 @@ for sample in samples:
             # Add the data to the csv file
             with open(comb_file_name, mode='a', newline='') as csv_file:
                 writer = csv.writer(csv_file)
-                writer.writerow([L, D, R, fineness, filename])
+                writer.writerow([L, D, R, F, filename])
 
             print(f"[{iteration}/{iteration_total}] Saved: {filename}")
 

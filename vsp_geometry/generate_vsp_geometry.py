@@ -168,7 +168,7 @@ for F in fineness:
             # Add the data to the csv file
             with open(comb_file_name, mode='a', newline='') as csv_file:
                 writer = csv.writer(csv_file)
-                writer.writerow([L, D, R, fineness, filename])
+                writer.writerow([L, D, R, F, filename])
 
             print(f"[{iteration}/{iteration_total}] Saved: {filename}")
 
