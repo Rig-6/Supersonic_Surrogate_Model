@@ -22,9 +22,18 @@ inp_geom_dir = Path(str(SCRIPT_DIR / "generated_geometries")) # Change to change
 opt_geom_dir = Path(str(SCRIPT_DIR / "farfield_optimized_geometries"))
 opt_geom_dir.mkdir(exist_ok=True)
 
+ffd_files = glob.glob(str(opt_geom_dir / "*.stp"))
+
+
 for input_path in glob.glob(os.path.join(inp_geom_dir, "*.stp")):
+
     step_num = 0  # Reset step number for each new geometry
-    base_name = os.path.splitext(os.path.basename(input_path))[0]
+    base_name = Path(input_path).stem
+    
+    if (opt_geom_dir / f'{base_name}_ffd.stp' in ffd_files):
+        print("Skipping")
+        continue
+
     print(f"Processing {base_name}...")
     gmsh.model.add(f"{base_name}_ffd")
 
@@ -67,7 +76,7 @@ for input_path in glob.glob(os.path.join(inp_geom_dir, "*.stp")):
     print(f"Created farfield volume with tag {farfield_tag}. [{(step_num := step_num + 1)}/3]")
 
     # Cut the farfield volume with the solid to create the final geometry
-    fluid_tag = gmsh.model.occ.cut([(3, farfield_tag)], [(3, solid)], removeObject=True, removeTool=True)
+    fluid_tag = gmsh.model.occ.cut([(3, farfield_tag)], [(solid)], removeObject=True, removeTool=True)
     gmsh.model.occ.synchronize()
     print(f"Cut the farfield volume with the solid. Resulting fluid domain tag: {fluid_tag}.")
 
@@ -89,7 +98,8 @@ for input_path in glob.glob(os.path.join(inp_geom_dir, "*.stp")):
     # (For looping only) clear the model to prepare for the next iteration
     gmsh.model.remove()
 
-    print(f"Finished processing {base_name}.[{(counter := counter + 1)}/{len(glob.glob(os.path.join(inp_geom_dir, '*.stp')))}]")
+    print(f"Finished processing {base_name}.[{(counter)}/{len(glob.glob(os.path.join(inp_geom_dir, '*.stp')))}]")
+    counter += 1
 
 # Finalize gmsh
 gmsh.finalize()
