@@ -60,9 +60,9 @@ for input_path in glob.glob(os.path.join(inp_geom_dir, "*.stp")):
     # print(nose_cone_geometry)
 
     # Initialize dimensions of farfield volume
-    farfield_rear_length = 10.0*(Lx)
+    farfield_rear_length = 5.0*(Lx)
     farfield_front_length = 2.0*(Lx)
-    farfield_diameter = 3.0*(Ly)
+    farfield_diameter = 20.0*(Ly)
     farfield_total_length = farfield_rear_length + Lx + farfield_front_length
 
     # Initialize volume location
@@ -93,8 +93,6 @@ for input_path in glob.glob(os.path.join(inp_geom_dir, "*.stp")):
     # if 'close' not in sys.argv:
         # gmsh.fltk.run()
 
-    print(gmsh.model.getEntities(dim=3))
-
     # (For looping only) clear the model to prepare for the next iteration
     gmsh.model.remove()
 
@@ -103,5 +101,3 @@ for input_path in glob.glob(os.path.join(inp_geom_dir, "*.stp")):
 
 # Finalize gmsh
 gmsh.finalize()
-
-
