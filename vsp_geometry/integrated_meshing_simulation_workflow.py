@@ -7,6 +7,8 @@ import ansys.fluent.core as pyfluent
 import glob
 import math
 
+from requests import session
+
 
 # Resolve Pathing
 SCRIPT_DIR = Path(__file__).parent.resolve() # Grabs script directory path
@@ -18,27 +20,29 @@ cas_output_dir.mkdir(exist_ok=True) # Creates the simulated output directory if 
 
 # Grab all the .stp files in the farfield_optimized_geometries directory
 stp_files = sorted(glob.glob(str(inp_ffd_dir / "*.stp")))
+cas_output_files = sorted(glob.glob(str(cas_output_dir / "*.cas.h5")))
+stripped_output_files = [str(Path(f).stem) for f in cas_output_files]
 
 # Make the CSV file to store the sim results
 with open(f'{cas_output_dir / "simulated.csv"}', mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['File_Name', 'Drag_Coefficient'])
+        writer.writerow(['Base_Name', 'Drag_Coefficient','Mach', 'Final_Delta_Pct', 'Blocks_Run', 'Converged', 'Reference_Area', 'Cell_Count'])
 
 for stp_file in stp_files:
     basename = os.path.splitext(os.path.basename(stp_file))[0] # Get the base name of the .stp file without extension
+    if (f'{basename}_sim.cas' in stripped_output_files):
+        print(f"Skipping {basename} as it has already been simulated.")
+        continue  # Skip this file if it's already been simulated
     import_file_name = str(stp_file) # Create the full path to the .stp file
     msh_output_file_name = str(msh_output_dir / f"{basename}_sim") # Create the path to the mesh output directory
     cas_output_file_name = str(cas_output_dir / f"{basename}_sim")
 
-    # Resolve file paths and naming
-    # import_file_name = str(inp_ffd_dir / "cone_L24.0_D3.0_R0.1_ffd.stp")
-
-
 
     os.environ["FLUENT_NO_AUTOMATIC_TRANSCRIPT"] = "1"
 
+
     # ---STEP 1: Import the geometry into Fluent Meshing---
-    meshy_session = pyfluent.launch_fluent(mode=pyfluent.FluentMode.MESHING, precision=pyfluent.Precision.DOUBLE, processor_count=12, show_gui=True) # Launch Fluent Meshing Session
+    meshy_session = pyfluent.launch_fluent(mode=pyfluent.FluentMode.MESHING, precision=pyfluent.Precision.DOUBLE, processor_count=4, show_gui=False) # Launch Fluent Meshing Session
     watertight = meshy_session.watertight() # Watertight Meshing Mode
     import_geometry = watertight.import_geometry # Load Import Geometry Function
     import_geometry.file_name = import_file_name # Set the file name for the geometry to be imported
@@ -60,12 +64,25 @@ for stp_file in stp_files:
         '(tgapi-util-convert-zone-ids-to-name-strings (get-face-zones-of-filter "*"))'
     )
 
-    zone_id = meshy_session.scheme_eval.scheme_eval(
-        "(get-face-zone-at-location '(2.0 0.15 0.0))"  # Edit with the correct coordinates for your geometry to get the zone ID of the cone wall face
-    )
+    mu = meshy_session.meshing_utilities
+    idareas = []
+    for zid in mu.get_face_zones(filter="*"):
+        idareas.append((mu.get_face_zone_area(face_zone_id_list=[zid]), zid))
+    
+    idareas.sort()
+    print(f"Face zones sorted by area: {idareas}")
+    zone_id = idareas[0][1]  # Get the zone ID of the smallest face zone
+
+    '''for zid in mu.get_face_zones(filter="*"):
+        print(zid,
+          mu.get_face_zone_area(face_zone_id_list=[zid]),
+          mu.get_average_bounding_box_center(face_zone_id_list=[zid]),
+          mu.get_bounding_box_of_zone_list(zone_id_list=[zid]))'''
+
     cone_wall_zone = meshy_session.scheme_eval.scheme_eval(
         f"(tgapi-util-convert-zone-ids-to-name-strings (list {zone_id}))"
     )[0]
+
     print(f"Cone wall zone: {cone_wall_zone}")
 
     add_local_sizing.Arguments.set_state({
@@ -86,8 +103,8 @@ for stp_file in stp_files:
     surf_mesh = meshy_session.workflow.TaskObject["Generate the Surface Mesh"] # Load the Generate Surface Mesh function
     surf_mesh.Arguments.set_state({
         r'CFDSurfaceMeshControls': {r'DrawSizeControl': True,
-                                    r'MaxSize': 819.2,
-                                    r'MinSize': 10,
+                                    # r'MaxSize': 819.2,
+                                    r'MinSize': 20,
                                     r'SizeFunctions': r'Curvature',
         },
         r'ExecuteShareTopology': r'No',
@@ -106,8 +123,6 @@ for stp_file in stp_files:
     describe_geometry() # Execute the Describe Geometry function
     print(f"---STEP 3: COMPLETED--- Described geometry for geometry: {import_file_name} into Fluent Meshing session.")
 
-
-
     # ---STEP 4: Update boundaries and regions---
     update_regions = meshy_session.workflow.TaskObject["Update Regions"]
     solid_region_name = solid_face_zone.removeprefix("origin-")
@@ -118,7 +133,6 @@ for stp_file in stp_files:
         r"RegionTypeList": [r'dead', r'fluid'],
     })
     update_regions.Execute()
-
     update_boundaries = watertight.update_boundaries # Load the Update Boundaries function
     update_boundaries() # Execute the Update Boundaries function
     print(f"---STEP 4: COMPLETED--- Updated regions and boundaries for geometry: {import_file_name} into Fluent Meshing session.")
@@ -136,6 +150,8 @@ for stp_file in stp_files:
     farfield_volume_volume = meshy_session.scheme_eval.scheme_eval(
     f"(tgapi-util-get-region-volume '{solid_region_name}' farfield_volume )" # Get fluid volume in mm^3
     )
+
+    # print(f"Farfield volume: {farfield_volume_volume} mm^3") # Print the fluid volume in mm^3
 
     cell_count = 0 # Initialize the cell count to 0
     target_cell_count = 750000 # Set the target cell count for the volume mesh
@@ -159,29 +175,6 @@ for stp_file in stp_files:
     cell_count = meshy_session.meshing_utilities.get_cell_zone_count(
         cell_zone_name_pattern="*"
     )
-
-    '''while(cell_count < 750000):
-        hex_max_cell_length = hex_max_cell_length * (cell_count / target_cell_count)**(1/3) # Increase the maximum cell length by 10% if the cell count is not within the desired range
-
-        volume_mesh.Arguments.set_state({
-            r'MeshSolidRegions': False,
-            r"VolumeFill": "poly-hexcore", 
-            r'VolumeFillControls': {
-                r'HexMaxCellLength': hex_max_cell_length,
-                r'HexMaxSize': hex_max_cell_length,
-                r'HexMinCellLength': 0.05,
-            },
-            r'VolumeMeshPreferences': {
-                    r'QualityWarningLimit': 0.15,
-            },
-        })
-        volume_mesh.Revert() # Revert the volume mesh to the previous state
-        volume_mesh.Execute() # Re-execute the volume mesh function
-
-
-        cell_count = meshy_session.meshing_utilities.get_cell_zone_count(
-            cell_zone_name_pattern="*"
-        )'''
 
     meshy_session.execute_tui(r'''/mesh/modify/improve-quality yes''')
     meshy_session.execute_tui(r'''/mesh/modify/auto-improve-warp yes''')
@@ -217,21 +210,23 @@ for stp_file in stp_files:
         zone_list=[solid_region_name + ':1'],
         new_type="pressure-far-field"
     )
-    # print(bc.pressure_far_field.get_object_names()) # Get the object names for the pressure far field boundary condition
+
     farfield_names = bc.pressure_far_field.get_object_names() # Get the object names for the pressure far field boundary condition
     pressure_farfield = bc.pressure_far_field[farfield_names[0]] # Load the pressure far field boundary condition
-    pressure_farfield.momentum.gauge_pressure = 0 # Set the gauge pressure for the pressure far field to 0
+    print(farfield_names[0]) # Print the name of the pressure far field boundary condition
+    pressure_farfield.momentum.gauge_pressure = 22632 # Set the gauge pressure for the pressure far field to 0
     pressure_farfield.momentum.mach_number = 2.0 # Set the mach number for the pressure far field to 2.0
-    pressure_farfield.thermal.temperature = 288.15 # Set the temperature for the pressure far field to 288.15
+    pressure_farfield.thermal.temperature = 216.65 # Set the temperature for the pressure far field to 216.65
     pressure_farfield.momentum.flow_direction[0] = 1.0 # Set the flow direction for the pressure far field to 1.0 in the x-direction
+    pressure_farfield.momentum.flow_direction[1] = 0.0 # Set the flow direction for the pressure far field to 0.0 in the y-direction
+    pressure_farfield.momentum.flow_direction[2] = 0.0 # Set the flow direction for the pressure far field to 0.0 in the z-direction
     pressure_farfield.turbulence.turbulent_intensity = 0.01
     pressure_farfield.turbulence.turbulent_viscosity_ratio = 10
 
-    solvy_session.settings.setup.general.operating_conditions.operating_pressure = 80600
-    solvy_session.settings.setup.general.operating_conditions.operating_pressure = 22632 
+    solvy_session.settings.setup.general.operating_conditions.operating_pressure = 0
 
-    solvy_session.execute_tui(r'''/solve/set/limits yes
-    100
+    solvy_session.execute_tui(r'''/solve/set/limits
+    1000
     5e+06
     50
     3000
@@ -240,129 +235,122 @@ for stp_file in stp_files:
     1e+5
     ''')
 
-    D_mm = 2.8 * 304.8   # 2.8 ft in mm
-    D_m = D_mm * 1.0e-3
+    solvy_session.settings.solution.methods.spatial_discretization.discretization_scheme = {'k' : 'first-order-upwind', 'omega' : 'first-order-upwind', 'amg-c' : 'first-order-upwind'}
+    solvy_session.settings.solution.methods.p_v_coupling.flux_type = 'AUSM'
+
+    cone_wall_zone_name = cone_wall_zone.removeprefix("origin-").removesuffix(":8") + ':14'
+
+    solvy_session.settings.solution.initialization.hybrid_initialize()
+
+    si = solvy_session.settings.results.report.surface_integrals
+    r_y = float(si.get_facet_max(surface_names=[cone_wall_zone_name], report_of="y-coordinate")[cone_wall_zone_name])
+    r_z = float(si.get_facet_max(surface_names=[cone_wall_zone_name], report_of="z-coordinate")[cone_wall_zone_name])
+    R_max = max(r_y, r_z)
+    A_ref = math.pi * R_max**2
+    print(f"Max radius: {R_max} m")
+    print(f"Reference area: {A_ref} m^2")
 
     gamma = 1.4
     R_air = 287.05
-    T_inf = 288.15
+    T_inf = 216.15
     p_inf = 22632.0
-    M_inf = 2.0  # You set 2.0 in this script
-
+    M_inf = 2.0
+    
     rho_inf = p_inf / (R_air * T_inf)
     a_inf = math.sqrt(gamma * R_air * T_inf)
     V_inf = M_inf * a_inf
-    A_ref = math.pi * D_m**2 / 4.0
-
+    
     ref = solvy_session.settings.setup.reference_values
     ref.area = A_ref
     ref.density = rho_inf
     ref.velocity = V_inf
 
-    solvy_session.settings.solution.methods.spatial_discretization.discretization_scheme = {'k' : 'first-order-upwind', 'omega' : 'first-order-upwind', 'mom' : 'first-order-upwind'}
-    solvy_session.execute_tui(r'''/solve/set/pseudo-time-method/relaxation-factors/omega 0.5''')
-    solvy_session.execute_tui(r'''/solve/set/pseudo-time-method/relaxation-factors/k 0.5''')
 
-    disc = solvy_session.settings.solution.methods.spatial_discretization.discretization_scheme
-    print(disc.get_state())   # look at the actual keys Fluent reports
-    disc.set_state({'flow': 'first-order-upwind', 'k': 'first-order-upwind', 'omega': 'first-order-upwind'})
-
-   
-
-    cone_wall_zone_name = cone_wall_zone.removeprefix("origin-").removesuffix(":8") + ':14'
-    # solvy_session.settings.solution.report_definitions.drag["cd_monitor"] = {
-         #"zones": [cone_wall_zone.removeprefix("origin-").removesuffix(":8") + ':14'],   # use your auto-detected cone wall zone           # flow direction
-    # }
-
-    '''solvy_session.settings.solution.initialization.hybrid_initialize()
     solvy_session.settings.solution.initialization.fmg.customize(multi_level_grid = 5, residual_reduction = [0.001, 0.001, 0.001, 0.001, 0.001], cycle_count = [100, 200, 400, 800, 800])
-    solvy_session.settings.solution.initialization.fmg.fmg_initialize() # Initialize the solution using FMG'''
-
-    init = solvy_session.settings.solution.initialization
-    init.reference_frame = "absolute"
-    init.compute_defaults.pressure_far_field[farfield_names[0]]()
-    init.initialize()
-    init.fmg.fmg_initialize()
+    solvy_session.settings.solution.initialization.fmg.fmg_initialize() # Initialize the solution using FMG
 
     solvy_session.execute_tui(
-        '''/solve/set/courant 0.5'''
+        '''/solve/set/courant 2.0'''
     )
 
-    solvy_session.execute_tui(r'''/solve/set/warped-face-gradient-correction/enable? yes''')
-
-    solvy_session.execute_tui(r'''rpsetvar 'temperature/secondary-gradient? #f''')
-
+    # solvy_session.execute_tui(r'''/solve/set/warped-face-gradient-correction/enable? yes''')
     
-
     print(f"---STEP 9: COMPLETED--- Defined model, materials, and boundary conditions and other settings for geometry: {import_file_name} into Fluent Meshing session.")
 
-    # ---STEP 10: Run the calculation and write results---
-
+    # ---STEP 10: Run the calculation in sequential blocks and display important information---
     iterations_per_block = 25
     number_of_blocks = 30
 
     reps = solvy_session.settings.solution.report_definitions # Load the report definitions
     reps.drag["cd_monitor"] = {
         "zones": [cone_wall_zone_name],   # use your auto-detected cone wall
+        'force_vector': [1.0, 0.0, 0.0],  # flow direction
+        'report_type': 'force',
     }
 
-    cfl_schedule = [0.5, 1, 2, 5, 10]
+    cd_history = []  # Initialize an empty list to store the drag coefficient values
 
-    prev_cd = None
     for block in range(number_of_blocks):
-        cfl = min(block, len(cfl_schedule) - 1)
+
+        gr = solvy_session.settings.results.graphics # Load the graphics settings
+        surf = solvy_session.settings.results.surfaces # Load the surfaces settings
+
+        # mid-plane through the z axis
+        surf.plane_surface["midplane"] = {
+            "method": "zx-plane",
+            "z": 0.0,
+        }
+
+        # Create a contour plot of the Mach number on the midplane
+        gr.contour["mach"] = {
+            "field": "mach-number",
+            "surfaces_list": ["midplane"],
+            "filled": True,
+            "node_values": True,
+        }
+        gr.contour["mach"].display() # Display the contour plot of the Mach number on the midplane
+        gr.picture.save_picture(file_name=str(cas_output_dir / f"{basename}_mach_midplane.png")) # Save the contour plot of the Mach number on the midplane to a file
+
+        solvy_session.settings.solution.monitor.residual.plot()
+        solvy_session.settings.results.graphics.picture.save_picture(
+            file_name=str(cas_output_dir / f"{basename}_residuals.png")
+        )
+        
         solvy_session.settings.solution.run_calculation.iterate(
             iter_count=iterations_per_block
         )
-        solvy_session.execute_tui(
-        f'''/solve/set/courant {cfl_schedule[cfl]}'''
-        )
 
-        cd = float(reps.drag["cd_monitor"].compute()[0])
-        print(f"block {block}: Cd = {cd:.6f}")
-        if prev_cd and abs(cd - prev_cd) / abs(cd) < 1e-4:
-            break
-        prev_cd = cd
+        cd = reps.compute(report_defs=["cd_monitor"])
+        print("Cd computed")
+        cd_value = cd[0]['cd_monitor'][0]  # Extract the drag coefficient value from the returned dictionary
+        print('cd_value grabbed', cd_value)
+        cd_history.append(cd_value)  # Append the current drag coefficient value to the history list
+        print('cd_history', cd_history)
 
-
-
-    results = reps.compute(report_defs=["drag_force_x", "cd_x"])
-    drag_N = float(results["drag_force_x"])
-    Cd = float(results["cd_x"])
-
-    current_iter = (block + 1) * iterations_per_block
-    print(f"Iter {current_iter:4d} | Drag = {drag_N:.3f} N | Cd = {Cd:.6f}")
-    
-    # solvy_session.settings.solution.run_calculation.iterate(iter_count=3000) # Run the calculation for 3000 iterations
-    # cd_value = solvy_session.settings.solution.report_definitions.compute(report_defs=["cd_monitor"])
-    # print(cd_value)
+        if len(cd_history) >= 4:
+            recent = cd_history[-4:]  # Get the last 4 drag coefficient values
+            deltas = [abs(recent[i+1]-recent[i]) for i in range(3)] # Calculate the absolute differences between consecutive drag coefficient values
+            if all(((d / abs(recent[-1])) < 0.001 for d in deltas)): # Check if all the differences are less than 0.1% of the last drag coefficient value
+                print(f"Converged after {block*iterations_per_block} iterations.") # Print a message indicating convergence if small drag differences are found
+                break # Stops iterating
+         
 
     # ---STEP 11: Define reports, write to values to csv file, and write case and data files---
 
-    cd_value = reps.drag["cd_monitor"].compute() # Compute the drag coefficient for the cone wall
-
-    try:
-        reps.drag["cd_pressure"] = {
-            "zones": [cone_wall_zone_name],   # use your auto-detected cone wall
-            "report_type": "force",
-            "options": {"coeff": True, "type": "pressure"},
-        }
-
-        reps.drag["cd_viscous"] = {
-            "zones": [cone_wall_zone_name],   # use your auto-detected cone wall
-            "report_type": "max",              # facet-maximum
-            "field": "pressure",              # static pressure
-            "surfaces": [cone_wall_zone_name],
-        }
-    except:
-        print("Error: Could not create cd_pressure and cd_viscous reports. Please check the zone names and report definitions.")
+    results = {
+        "basename": basename,
+        "cd": cd_history[-1],
+        "Mach": M_inf,
+        "final_delta_pct": 100 * deltas[-1] / cd_history[-1],
+        "blocks_run": block + 1,
+        "converged": block + 1 < number_of_blocks,
+        "ref_area": A_ref,
+        "cell_count": cell_count,
+    }
 
     with open(f'{cas_output_dir / "simulated.csv"}', mode='a', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow([basename, cd_value]) # Write the drag coefficient value to the csv file
-
-
-
+        writer = csv.DictWriter(file, fieldnames=results.keys())
+        writer.writerow(results) # Write the drag coefficient value to the csv file
 
     solvy_session.settings.file.write(file_type="case", file_name=f"{cas_output_file_name}.cas.h5")
     solvy_session.settings.file.write(file_type="data", file_name=f"{cas_output_file_name}.dat.h5")

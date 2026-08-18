@@ -17,7 +17,16 @@ import numpy as np
 #Imports Quasi Monte Carlo sampling for Latin Hypercube Sampling
 from scipy.stats import qmc
 
-sampler = qmc.LatinHypercube(d=2)  # 2 parameters: fineness, diameter
+import hashlib
+
+def run_id(index: int, *params: float) -> str:
+    """Generates a unique run ID based on the index and parameters."""
+    payload = "|".join(f"{p:.10g}" for p in params)
+    digest = hashlib.sha1(payload.encode()).hexdigest()[:8]
+    return f"{index:03d}_{digest}"
+    
+
+sampler = qmc.LatinHypercube(d=2, seed=42)  # 2 parameters: fineness, diameter
 
 # The vsp module for generating the geometries
 def add_openvsp_paths() -> None:
@@ -92,10 +101,10 @@ comb_file_name = geom_dir / "parameter_combinations.csv"
 
 with open(comb_file_name, mode='w', newline='') as csv_file:
     writer = csv.writer(csv_file)
-    writer.writerow(['Length', 'Diameter',  'Fineness_Ratio', 'STEP_File_Name'])
+    writer.writerow(['Run_ID','Length', 'Diameter',  'Fineness_Ratio', 'STEP_File_Name'])
 
 # --> Section 3: Generate the geometries and save them as STL files
-iteration_total = 27 # Total number of samples to generate
+iteration_total = 20 # Total number of samples to generate
 samples = sampler.random(n=iteration_total) # Generates iteration_total amount samples, samples have 3 parameters (fineness, diameter, nose radius)
 iteration = 0
 print(f"Generating {iteration_total} nose cones with parameter combinations")
@@ -104,8 +113,9 @@ samples = qmc.scale(samples, lower_bounds, upper_bounds) #fits sample parameters
 
 for sample in samples:
             F, D = sample  # Unpack the parameters from the sample    
+            R = D / 2  # Calculate radius from diameter
             iteration += 1
-            L = F * D  # Calculate length based on fineness ratio and diameter
+            L = F * R  # Calculate length based on fineness ratio and radius (normally diameter but not for OpenVSP I guess)
             
             # Clean OpenVSP Workspace
             vsp.ClearVSPModel()
@@ -116,7 +126,7 @@ for sample in samples:
             # Modify geometry parameters
             vsp.SetParmVal(nose_cone_id, "Length", "Design", L)
 
-            # Bluntness is controlled by the fineness ratio, which is the length divided by the diameter
+            # Bluntness is controlled by the fineness ratio, which is the length divided by the radius (normally diameter but not for OpenVSP I guess)
             vsp.SetParmVal(nose_cone_id, "FineRatio", "Design", F)
 
             # Smooth the mesh by increasing the number of circumferential and longitudinal cuts (Doesn't matter for STEP files)
@@ -125,7 +135,8 @@ for sample in samples:
             # vsp.Update()
 
             # Generate the filename 
-            filename = f"cone_L{L:.1f}_D{D:.1f}.stp"
+            rid = run_id(iteration, L, D)
+            filename = f"cone_{rid}_L{L:.2f}_R{R:.2f}.stp"
 
             # Resolve file path to geometry directory
 
@@ -169,7 +180,7 @@ for sample in samples:
             # Add the data to the csv file
             with open(comb_file_name, mode='a', newline='') as csv_file:
                 writer = csv.writer(csv_file)
-                writer.writerow([L, D, F, filename])
+                writer.writerow([rid, L, D, F, filename])
 
             print(f"[{iteration}/{iteration_total}] Saved: {filename}")
 

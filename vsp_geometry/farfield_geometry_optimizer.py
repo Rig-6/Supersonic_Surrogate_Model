@@ -23,6 +23,9 @@ opt_geom_dir = Path(str(SCRIPT_DIR / "farfield_optimized_geometries"))
 opt_geom_dir.mkdir(exist_ok=True)
 
 ffd_files = glob.glob(str(opt_geom_dir / "*.stp"))
+# print(ffd_files)
+stripped_ffd_files = [f'{str(Path(f).stem)}.stp' for f in ffd_files]
+# print(stripped_ffd_files)
 
 
 for input_path in glob.glob(os.path.join(inp_geom_dir, "*.stp")):
@@ -30,7 +33,7 @@ for input_path in glob.glob(os.path.join(inp_geom_dir, "*.stp")):
     step_num = 0  # Reset step number for each new geometry
     base_name = Path(input_path).stem
     
-    if (opt_geom_dir / f'{base_name}_ffd.stp' in ffd_files):
+    if (f'{base_name}_ffd.stp' in stripped_ffd_files):
         print("Skipping")
         continue
 
@@ -62,7 +65,7 @@ for input_path in glob.glob(os.path.join(inp_geom_dir, "*.stp")):
     # Initialize dimensions of farfield volume
     farfield_rear_length = 5.0*(Lx)
     farfield_front_length = 2.0*(Lx)
-    farfield_diameter = 20.0*(Ly)
+    farfield_diameter = 10.0*(Ly)
     farfield_total_length = farfield_rear_length + Lx + farfield_front_length
 
     # Initialize volume location
