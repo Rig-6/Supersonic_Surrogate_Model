@@ -11,6 +11,9 @@ venv/
 *.pth
 *.onnx
 
+# Images
+*.png
+
 # OpenVSP and CAD
 *.vsp3
 *.stl
@@ -26,6 +29,10 @@ venv/
 *.dat
 *.log
 *.vtk
+*.sf
+*.pmdb
+*.wft
+
 
 # C++/Hardware (for elko)
 build/
