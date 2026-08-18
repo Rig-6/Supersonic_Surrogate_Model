@@ -1,0 +1,20 @@
+# Python 3.13 — required by the OpenVSP bundled bindings.
+#
+# NOT installable via pip, must be obtained separately:
+#   OpenVSP        (NASA, open source)  https://openvsp.org  — Python API, see README
+#   Ansys Fluent   (commercial license) — required for the meshing + solve stages
+#
+# ansys-fluent-core is only the Python client; it does not include Fluent itself.
+
+# --- geometry generation -----------------------------------------------------
+scipy==1.18.0                 # Latin Hypercube Sampling (scipy.stats.qmc)
+numpy==2.5.1
+
+# --- farfield domain construction --------------------------------------------
+gmsh==4.15.2                  # GPL-2.0; used as a library, not redistributed here
+
+# --- meshing + CFD solve ------------------------------------------------------
+ansys-fluent-core==0.40.3     # PyFluent client for Ansys Fluent 2025 R2
+
+# --- data handling ------------------------------------------------------------
+pandas==2.3.3

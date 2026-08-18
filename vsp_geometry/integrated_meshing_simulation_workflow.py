@@ -24,9 +24,10 @@ cas_output_files = sorted(glob.glob(str(cas_output_dir / "*.cas.h5")))
 stripped_output_files = [str(Path(f).stem) for f in cas_output_files]
 
 # Make the CSV file to store the sim results
-with open(f'{cas_output_dir / "simulated.csv"}', mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(['Base_Name', 'Drag_Coefficient','Mach', 'Final_Delta_Pct', 'Blocks_Run', 'Converged', 'Reference_Area', 'Cell_Count'])
+if not os.path.exists(f'{cas_output_dir / "simulated.csv"}'):
+    with open(f'{cas_output_dir / "simulated.csv"}', mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['Base_Name', 'Drag_Coefficient','Mach', 'Final_Delta_Pct', 'Blocks_Run', 'Converged', 'Reference_Area', 'Cell_Count'])
 
 for stp_file in stp_files:
     basename = os.path.splitext(os.path.basename(stp_file))[0] # Get the base name of the .stp file without extension
@@ -216,7 +217,7 @@ for stp_file in stp_files:
     print(farfield_names[0]) # Print the name of the pressure far field boundary condition
     pressure_farfield.momentum.gauge_pressure = 22632 # Set the gauge pressure for the pressure far field to 0
     pressure_farfield.momentum.mach_number = 2.0 # Set the mach number for the pressure far field to 2.0
-    pressure_farfield.thermal.temperature = 216.65 # Set the temperature for the pressure far field to 216.65
+    pressure_farfield.thermal.temperature = 216.15 # Set the temperature for the pressure far field to 216.65
     pressure_farfield.momentum.flow_direction[0] = 1.0 # Set the flow direction for the pressure far field to 1.0 in the x-direction
     pressure_farfield.momentum.flow_direction[1] = 0.0 # Set the flow direction for the pressure far field to 0.0 in the y-direction
     pressure_farfield.momentum.flow_direction[2] = 0.0 # Set the flow direction for the pressure far field to 0.0 in the z-direction

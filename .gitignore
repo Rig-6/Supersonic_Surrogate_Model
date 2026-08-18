@@ -5,14 +5,12 @@ venv/
 .env
 
 # Data and Models
-*.csv
 *.h5
 *.pt
 *.pth
 *.onnx
 
 # Images
-*.png
 
 # OpenVSP and CAD
 *.vsp3
