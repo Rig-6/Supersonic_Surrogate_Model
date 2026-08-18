@@ -123,8 +123,6 @@ While the progress made so far has been incredible and an amazing learning exper
 
 Stated plainly, because they affect how the numbers should be read.
 
-- **The results table is incomplete.** All 20 cases have solved case/data files on disk, but `simulated.csv` is currently rewritten from scratch on each run while already-solved cases are skipped — so rows from earlier runs were lost. Fixed rows are being re-exported from the saved `.dat.h5` files.
-- **`Fineness_Ratio` in `parameter_combinations.csv` stores L/R, not the conventional L/D.** Figures in this README use L/D. The column will be renamed.
 - **Cell counts run 0.9–2.1 M against a 750 k target.** The hex sizing is derived from domain volume, which does not fully control the surface-driven refinement. Mesh independence has not been formally demonstrated.
 - **Base drag is included.** The POD is a closed body, so reported drag coefficient covers forebody wave drag, skin friction, and base pressure together. It is not directly comparable to published sharp-cone wave-drag coefficients.
 - **Single Mach number.** Every result here is at M = 2.0.
